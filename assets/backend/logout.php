@@ -1,16 +1,20 @@
 <?php
 
-// he page admin logout sathi ahe 
+// Admin logout functionality
 
 // Start a new session
 session_start();
 
-// Unset the 'admin_logged_in' session variable
+// Unset all admin session variables
 unset($_SESSION['admin_logged_in']);
+unset($_SESSION['adminName']);
+unset($_SESSION['admin_id']);
+unset($_SESSION['adminEmail']);
 
-// Destroy the session
-// session_destroy();
+// Destroy the session completely
+session_destroy();
 
-// Redirect the user to the login page
-header("location:http://localhost/employeeManagementPHP/admin/index.php?msg=logout");
+// Redirect the user to the admin login page
+header("location:http://localhost:8000/admin/index.php?msg=logout");
+exit();
 ?>

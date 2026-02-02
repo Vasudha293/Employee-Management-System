@@ -7,35 +7,52 @@ include 'db_connection.php';
 $employee_email = $_POST['employeeEmail'];
 $employee_password = $_POST['employeePassword'];
 
-// check if the employee ch login button click kely ka nahi
+// check if the employee login button was clicked
 if(isset($_POST['employee_login_btn'])){
-        // emp chya table mndhun email varun details gheun check karne
-        $select = "SELECT * FROM `employee` WHERE email = '$employee_email'";
-        $query = mysqli_query($conn, $select);
-        $row = mysqli_fetch_assoc($query);
-        
-        // if the employee exists in the database then khalil 
-        if($row){
-            // check if password jar mach zala tr
-            if($row['password']===$employee_password){
-                // jar password mach zala tr session enabled karun dene
-                echo $row['name'];
-                $_SESSION['employeeName'] = $row['name'];
-                $_SESSION['employee_id'] = $row['id'];
-                $_SESSION['employeeEmail'] = $row['email'];
-                $_SESSION['employee_logged_in'] = true;
-
-                header("location:http://localhost/employeeManagementPHP/home.php?employee_id=$row[id]&username=$row[name]");
-            }else{
-                // if the password does not match then part same page la redirect kara
-                echo "<script>alert('Password does not match...try again!!'); window.location='../../index.php';</script>";
-
-            }
-                  
-        }else{
-            // if the employee does not exist : alred deun part same page la redirect kara
-            echo "<script>alert('Employee does not exist...try again!!'); window.location='../../index.php';</script>";
+    // Get employee details from database
+    $select = "SELECT id, name, email, password FROM employee WHERE email = '$employee_email'";
+    $result = executeQuery($select);
+    
+    // Parse the result (command line MySQL returns tab-separated values)
+    $lines = explode("\n", trim($result));
+    $cleanLines = [];
+    
+    foreach ($lines as $line) {
+        // Skip warning messages
+        if (strpos($line, 'Warning') === false && strpos($line, 'mysql:') === false && !empty(trim($line))) {
+            $cleanLines[] = trim($line);
         }
+    }
+    
+    if (count($cleanLines) >= 2) { // First line is headers, second line is data
+        $headers = explode("\t", $cleanLines[0]);
+        $data = explode("\t", $cleanLines[1]);
+        
+        // Create associative array
+        if (count($headers) == count($data)) {
+            $row = array_combine($headers, $data);
+            
+            if($row && isset($row['password'])){
+                if($row['password'] === $employee_password){
+                    $_SESSION['employeeName'] = $row['name'];
+                    $_SESSION['employee_id'] = $row['id'];
+                    $_SESSION['employeeEmail'] = $row['email'];
+                    $_SESSION['employee_logged_in'] = true;
+
+                    header("location:http://localhost:8000/home.php?employee_id=" . urlencode($row['id']) . "&username=" . urlencode($row['name']));
+                    exit();
+                }else{
+                    echo "<script>alert('Password does not match...try again!!'); window.location='http://localhost:8000/index.php';</script>";
+                }
+            }else{
+                echo "<script>alert('Employee does not exist...try again!!'); window.location='http://localhost:8000/index.php';</script>";
+            }
+        } else {
+            echo "<script>alert('Employee does not exist - data mismatch!'); window.location='http://localhost:8000/index.php';</script>";
+        }
+    }else{
+        echo "<script>alert('Employee does not exist...try again!!'); window.location='http://localhost:8000/index.php';</script>";
+    }
 }
 
 ?>

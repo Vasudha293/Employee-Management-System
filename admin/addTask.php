@@ -1,113 +1,271 @@
 <?php
-    include '../assets/backend/db_connection.php';
-    if($_SESSION['admin_logged_in'] == true){  
-    include '../assets/backend/task.php';
-    include '../assets/backend/employee.php';
+include '../assets/backend/db_connection.php';
 
+if(!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] != true){
+    header("location:http://localhost:8000/admin/index.php");
+    exit();
+}
 
+$employee_id = isset($_GET['employee_id']) ? $_GET['employee_id'] : 0;
+
+// Get employee details
+$employeeQuery = "SELECT name, email FROM employee WHERE id = '$employee_id'";
+$employeeResult = executeQuery($employeeQuery);
+$employee = null;
+
+if (!empty($employeeResult) && strpos($employeeResult, 'ERROR') === false) {
+    $lines = explode("\n", trim($employeeResult));
+    $cleanLines = [];
+    
+    foreach ($lines as $line) {
+        if (strpos($line, 'Warning') === false && strpos($line, 'mysql:') === false && !empty(trim($line))) {
+            $cleanLines[] = trim($line);
+        }
+    }
+    
+    if (count($cleanLines) >= 2) {
+        $headers = explode("\t", $cleanLines[0]);
+        $data = explode("\t", $cleanLines[1]);
+        if (count($headers) == count($data)) {
+            $employee = array_combine($headers, $data);
+        }
+    }
+}
+
+// Handle form submissions
+if(isset($_POST['add-task-btn'])){
+    $taskText = $_POST['add-task'];
+    if(!empty($taskText)){
+        $insertQuery = "INSERT INTO tasklist (employee_id, tasks, status, created_at, updated_at) VALUES ('$employee_id', '$taskText', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+        $insertResult = executeQuery($insertQuery);
+        
+        if(strpos($insertResult, 'ERROR') === false){
+            $successMessage = "Task added successfully!";
+        } else {
+            $errorMessage = "Failed to add task. Please try again.";
+        }
+    } else {
+        $errorMessage = "Please enter a task description.";
+    }
+}
+
+// Handle task completion
+if(isset($_POST['mCompleted-btn'])){
+    $task_id = $_GET['task_id'];
+    $updateQuery = "UPDATE tasklist SET status = 1, updated_at = CURRENT_TIMESTAMP WHERE id = '$task_id'";
+    $updateResult = executeQuery($updateQuery);
+    
+    if(strpos($updateResult, 'ERROR') === false){
+        $successMessage = "Task marked as completed!";
+    }
+}
+
+// Handle task deletion
+if(isset($_POST['task-dlt-btn'])){
+    $task_id = $_GET['task_id'];
+    $deleteQuery = "DELETE FROM tasklist WHERE id = '$task_id'";
+    $deleteResult = executeQuery($deleteQuery);
+    
+    if(strpos($deleteResult, 'ERROR') === false){
+        $successMessage = "Task deleted successfully!";
+    }
+}
+
+// Get tasks for this employee
+$tasksQuery = "SELECT id, tasks, status, created_at FROM tasklist WHERE employee_id = '$employee_id' ORDER BY created_at DESC";
+$tasksResult = executeQuery($tasksQuery);
+
+$tasks = [];
+if (!empty($tasksResult) && strpos($tasksResult, 'ERROR') === false) {
+    $lines = explode("\n", trim($tasksResult));
+    $cleanLines = [];
+    
+    foreach ($lines as $line) {
+        if (strpos($line, 'Warning') === false && strpos($line, 'mysql:') === false && !empty(trim($line))) {
+            $cleanLines[] = trim($line);
+        }
+    }
+    
+    if (count($cleanLines) >= 1) {
+        $headers = explode("\t", $cleanLines[0]);
+        for ($i = 1; $i < count($cleanLines); $i++) {
+            $data = explode("\t", $cleanLines[$i]);
+            if (count($headers) == count($data)) {
+                $tasks[] = array_combine($headers, $data);
+            }
+        }
+    }
+}
 ?>
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Unanda Bricks Co.S</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+    <title>Unanda Bricks Co. - Manage Tasks</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/style.css">
   </head>
   <body>
-        <!-- Navbar -->
-        <nav class="navbar bg-light">
+        <!-- Modern Navbar -->
+        <nav class="navbar navbar-expand-lg sticky-top">
             <div class="container">
-                <span class="navbar-brand mb-0 h1"><?php echo $_SESSION['adminName'];?></span>
-                <div class=" logout-btn"><a href="home.php?username=<?php echo $_SESSION['adminName'];?>">home</a></div>
-                <div class=" logout-btn"><a href="../assets/backend/logout.php">Logout</a></div>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-tasks text-primary me-2 fs-4"></i>
+                    <span class="navbar-brand mb-0 h1">Task Management</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="text-muted me-3">Welcome, <strong><?php echo $_SESSION['adminName'];?></strong></span>
+                    <div class="logout-btn me-3">
+                        <a href="home.php" class="d-flex align-items-center">
+                            <i class="fas fa-home me-1"></i> Dashboard
+                        </a>
+                    </div>
+                    <div class="logout-btn">
+                        <a href="../assets/backend/logout.php" class="d-flex align-items-center">
+                            <i class="fas fa-sign-out-alt me-1"></i> Logout
+                        </a>
+                    </div>
+                </div>
             </div>
         </nav>
-        <!-- ./Navbar -->
 
-        <!-- Todo section  -->
-        <div class="container">
+        <!-- Main Content -->
+        <div class="container my-5">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="text-center text-white fade-in-up">
+                        <h1 class="display-6 fw-bold mb-3">Task Management</h1>
+                        <?php if($employee): ?>
+                        <p class="lead">Managing tasks for <strong><?php echo htmlspecialchars($employee['name']); ?></strong></p>
+                        <p class="text-white-50"><?php echo htmlspecialchars($employee['email']); ?></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <?php if(isset($successMessage)): ?>
+            <div class="alert alert-success d-flex align-items-center fade-in-up" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                <?php echo $successMessage; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if(isset($errorMessage)): ?>
+            <div class="alert alert-danger d-flex align-items-center fade-in-up" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <?php echo $errorMessage; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Add Task Section -->
+            <div class="row mb-5">
+                <div class="col-lg-8 offset-lg-2">
+                    <div class="card fade-in-up" style="animation-delay: 0.2s;">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add New Task</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-clipboard-list"></i></span>
+                                    <input type="text" class="form-control" name="add-task" 
+                                           placeholder="Enter task description..." required>
+                                    <button class="btn btn-primary" name="add-task-btn" type="submit">
+                                        <i class="fas fa-plus me-1"></i>Add Task
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks Table -->
             <div class="row">
-                <div class="col-md-6 offset-md-3">
-                    <!-- add todo -->
-                            <div id="add-btn" class=" d-flex justify-content-center mt-5">
-                                    <span  class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Todo</span>    
-                            </div>
-                            <div id="add-todo-form" class="mt-5">
-                                <form action=<?php echo "../assets/backend/task.php?employee_id=".$_GET['employee_id']?> method="post" >
-                                    <div class="input-group mb-3">
-                                        <input type="text" class="form-control" id="add-task" name="add-task" placeholder="Enter your task here"  >
-                                        <button class="btn btn-primary" name="add-task-btn" id="add-task-btn" type="submit">Add</button>
-                                    </div>
-                                </form>
-                            </div>
-                    <!-- ./add todo -->
-
-                    <!-- todo table -->
-                    <table class="table border rounded mt-5" >
-                        <thead>
-                            <tr>
-                            <th scope="col">#</th>
-                            <th class="text-center" scope="col">Creation Date</th>
-
-                                                        <th class="text-center" scope="col">Task</th>
-<th class="text-center" scope="col">
-                                Actions
-                            </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php $sno = 1; while($task = mysqli_fetch_assoc($st_query)){?>
-                                <tr>
-                                <th scope="row" ><?php echo $sno++;?></th>
-                                <td class="text-center">
-                                    <div class="task-list">
-                                        <?php echo $task['created_at'];?>
-                                    </div>
-                                </td>
-                                <td class="text-center">
-                                    <div class="task-list">
-                                        <?php echo $task['tasks'];?>
-                                    </div>
-                            </td>
-                                <td class="text-center d-flex justify-content-center">
-                                    <button class="btn btn-success m-1 <?php if($task['status']==1) {echo "d-inline";}else{echo "d-none";}?>" >Completed</button>
-
-                                    <form class="" action="../assets/backend/task.php?employee_id=<?php echo $_GET['employee_id'];?>&task_id=<?php echo $task['id'];?>" method="post">
-                                        <button class="btn btn-warning m-1 <?php if($task['status']==0) {echo "d-inline";}else{echo "d-none";}?>" name="mCompleted-btn" id="mCompleted-btn" type="submit">Mark as Completed</button>
-                                        <button class="btn btn-danger m-1 d-inline" name="task-dlt-btn" id="task-dlt-btn" type="submit">Delete</button>
-
-                                    </form>
-                                    
-
-                                </td>
-                                </tr>
-                            <?php }?>
-                            
-                        </tbody>
-                    </table>
-                    <!-- ./todo table -->
+                <div class="col-12">
+                    <div class="employee_table fade-in-up" style="animation-delay: 0.4s;">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col"><i class="fas fa-hashtag me-2"></i>#</th>
+                                        <th scope="col"><i class="fas fa-calendar me-2"></i>Created</th>
+                                        <th scope="col"><i class="fas fa-clipboard-list me-2"></i>Task Description</th>
+                                        <th scope="col"><i class="fas fa-info-circle me-2"></i>Status</th>
+                                        <th scope="col"><i class="fas fa-cogs me-2"></i>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($tasks)): ?>
+                                    <tr>
+                                        <td colspan="5" class="text-center py-5">
+                                            <div class="text-muted">
+                                                <i class="fas fa-clipboard-list fs-1 mb-3 d-block"></i>
+                                                <h5>No tasks assigned yet</h5>
+                                                <p class="mb-0">Add the first task using the form above</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php else: ?>
+                                    <?php $sno = 1; foreach($tasks as $task): ?>
+                                    <tr>
+                                        <th scope="row" class="fw-bold text-primary"><?php echo $sno++; ?></th>
+                                        <td>
+                                            <small class="text-muted">
+                                                <?php echo date('M d, Y H:i', strtotime($task['created_at'])); ?>
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <div class="task-description">
+                                                <?php echo htmlspecialchars($task['tasks']); ?>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <?php if($task['status'] == 1): ?>
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Completed
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-clock me-1"></i>Pending
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <?php if($task['status'] == 0): ?>
+                                                <form method="post" action="?employee_id=<?php echo $employee_id; ?>&task_id=<?php echo $task['id']; ?>" style="display: inline;">
+                                                    <button type="submit" name="mCompleted-btn" class="btn btn-success btn-sm" title="Mark as Completed">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                                <?php endif; ?>
+                                                
+                                                <form method="post" action="?employee_id=<?php echo $employee_id; ?>&task_id=<?php echo $task['id']; ?>" 
+                                                      style="display: inline;" 
+                                                      onsubmit="return confirm('Are you sure you want to delete this task?')">
+                                                    <button type="submit" name="task-dlt-btn" class="btn btn-danger btn-sm" title="Delete Task">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <!-- ./Todo section  -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/js/all.min.js" integrity="sha512-rpLlll167T5LJHwp0waJCh3ZRf7pO6IT1+LZOhAyP6phAirwchClbTZV3iqL3BMrVxIYRbzGTpli4rfxsCK6Vw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
-    
-    <script>
-        $(document).ready(function(){
-            $( "#add-btn" ).click(function() {
-                    $("#add-todo-form").toggle();   
-            });
-        });
-    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
-
-<?php
-    }else{
-        header("location:http://localhost/employeeManagementPHP/admin/index.php?msg=login_first");
-    }
-?>

@@ -1,10 +1,20 @@
 <?php
-// start the session
+
+// Employee logout functionality
+
+// Start the session
 session_start();
 
-// unset the session variable for employee_logged_in to log out
+// Unset all employee session variables
 unset($_SESSION['employee_logged_in']);
+unset($_SESSION['employeeName']);
+unset($_SESSION['employee_id']);
+unset($_SESSION['employeeEmail']);
 
-// redirect the main login page
-header("location:http://localhost/employeeManagementPHP/index.php?msg=logout");
+// Destroy the session completely
+session_destroy();
+
+// Redirect to the employee login page
+header("location:http://localhost:8000/index.php?msg=logout");
+exit();
 ?>
